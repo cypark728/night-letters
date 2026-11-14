@@ -1,4 +1,7 @@
+import { ReplyCache } from './replyCache'
 import { supabase } from './supabase'
+import { clearPreloadedPhotos } from './preloadPhoto'
+import { PhotoUrlCache } from './photoUrlCache'
 import { addDays } from './date'
 
 export interface Member {
@@ -16,6 +19,8 @@ export interface Entry {
   created_at: string
   updated_at: string
 }
+
+const dayReplies = new ReplyCache<Entry[]>()
 
 const ENTRY_COLS = 'id, member_id, entry_date, letter_label, body, photo_path, created_at, updated_at'
 
@@ -60,7 +65,11 @@ export async function joinGroup(code: string, memberId: string): Promise<void> {
 
 /** 이 기기 연결 해제 (다른 이름으로 다시 들어가기) */
 export async function leaveDevice(): Promise<void> {
-  await supabase.auth.signOut()
+  dayReplies.clear()
+  photoUrls.clear()
+  clearPreloadedPhotos()
+  const { error } = await supabase.auth.signOut()
+  fail(error)
 }
 
 export async function fetchRange(from: string, to: string): Promise<Entry[]> {
@@ -74,7 +83,7 @@ export async function fetchRange(from: string, to: string): Promise<Entry[]> {
 }
 
 export const fetchWeek = (monday: string) => fetchRange(monday, addDays(monday, 4))
-export const fetchDay = (date: string) => fetchRange(date, date)
+export const fetchDay = (date: string) => dayReplies.get(date, () => fetchRange(date, date))
 
 export async function fetchMyEntry(memberId: string, date: string): Promise<Entry | null> {
   const { data, error } = await supabase
@@ -96,13 +105,19 @@ export interface EntryInput {
 }
 
 export async function saveEntry(input: EntryInput): Promise<void> {
-  const { error } = await supabase.from('entries').upsert(input, { onConflict: 'member_id,entry_date' })
-  fail(error)
+  dayReplies.clear()
+  try {
+    const { error } = await supabase.from('entries').upsert(input, { onConflict: 'member_id,entry_date' })
+    fail(error)
+  } finally { dayReplies.clear() }
 }
 
 export async function deleteEntry(id: string): Promise<void> {
-  const { error } = await supabase.from('entries').delete().eq('id', id)
-  fail(error)
+  dayReplies.clear()
+  try {
+    const { error } = await supabase.from('entries').delete().eq('id', id)
+    fail(error)
+  } finally { dayReplies.clear() }
 }
 
 export async function uploadPhoto(memberId: string, date: string, file: File): Promise<string> {
@@ -121,14 +136,13 @@ export async function removePhoto(path: string): Promise<void> {
 }
 
 /** 비공개 사진을 1시간짜리 서명 URL로 */
-export async function signedUrls(paths: string[]): Promise<Record<string, string>> {
-  const unique = [...new Set(paths.filter(Boolean))]
-  if (unique.length === 0) return {}
-  const { data, error } = await supabase.storage.from('photos').createSignedUrls(unique, 60 * 60)
-  fail(error)
-  const map: Record<string, string> = {}
-  for (const row of data ?? []) {
-    if (row.path && row.signedUrl) map[row.path] = row.signedUrl
-  }
-  return map
+const photoUrls = new PhotoUrlCache()
+export async function signedUrls(paths: string[], force=false): Promise<Record<string, string>> {
+  return photoUrls.get(paths, async missing => {
+    const { data, error } = await supabase.storage.from('photos').createSignedUrls(missing, 60 * 60)
+    fail(error)
+    const map:Record<string,string>={}
+    for(const row of data ?? []) if(row.path && row.signedUrl) map[row.path]=row.signedUrl
+    return map
+  }, force)
 }

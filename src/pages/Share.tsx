@@ -1,7 +1,8 @@
 import { useEffect, useRef, useCallback } from 'react'
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { preloadPhoto } from '../lib/preloadPhoto'
 import { readingIndex } from '../lib/reading'
-import { fetchDay } from '../lib/api'
+import { fetchDay, signedUrls } from '../lib/api'
 import { LETTERS, letterForDate, letterGroup, nextLetter } from '../lib/date'
 import { sortByMembers, useLoad, usePhotoUrls } from '../lib/hooks'
 import { useSession } from '../session'
@@ -33,11 +34,28 @@ export default function Share() {
     const entry=entries[index]
     if(entry) setParams({reply:entry.id}, {replace:true})
   }, [entries, setParams])
+  const nextPhoto = entries.slice(idx+1).find(entry=>entry.photo_path)?.photo_path
+  const nextPhotoUrl = nextPhoto ? urls[nextPhoto] : undefined
+  useEffect(()=>{ if(nextPhotoUrl) preloadPhoto(nextPhotoUrl) },[nextPhotoUrl])
   const cur = entries[idx]
   const curName = cur ? (memberById[cur.member_id]?.name ?? '알 수 없음') : ''
   const curUrl = cur?.photo_path ? urls[cur.photo_path] : undefined
   const next = letter ? nextLetter(letter.date) : undefined
   const atGroupEnd = !next || (letter && letterGroup(letter.date).at(-1)?.date === letter.date)
+  const nextDate = !atGroupEnd && next ? next.date : undefined
+  const atLastReply = !loading && !error && idx === Math.max(0, entries.length-1)
+  useEffect(()=>{
+    if(!atLastReply || !nextDate) return
+    let alive=true
+    void fetchDay(nextDate).then(async list=>{
+      if(!alive) return
+      const path=sortByMembers(list,members).find(entry=>entry.photo_path)?.photo_path
+      if(!path) return
+      const result=await signedUrls([path])
+      if(alive && result[path]) preloadPhoto(result[path])
+    }).catch(()=>{ /* Optional prefetch must never interrupt reading. */ })
+    return ()=>{alive=false}
+  },[atLastReply,nextDate,members])
   const advance = useCallback(() => {
     if (idx < entries.length - 1) choose(idx+1)
     else nav(atGroupEnd ? '/' : `/share/${next?.date}`)

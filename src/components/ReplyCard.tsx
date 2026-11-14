@@ -1,18 +1,18 @@
-import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { Entry, Member } from '../lib/api'
+import { Photo } from './Photo'
 import { stamp } from '../lib/date'
-import { Avatar, Icon, Lightbox } from './ui'
+import { Avatar, Icon } from './ui'
 
 interface Props {
   entry: Entry
   member: Member | undefined
   photoUrl?: string
   mine?: boolean
+  onOpen: () => void
 }
 
-export function ReplyCard({ entry, member, photoUrl, mine }: Props) {
-  const [zoom, setZoom] = useState(false)
+export function ReplyCard({ entry, member, photoUrl, mine, onOpen }: Props) {
   const name = member?.name ?? '알 수 없음'
   return (
     <article className="paper reply">
@@ -29,12 +29,7 @@ export function ReplyCard({ entry, member, photoUrl, mine }: Props) {
         </div>
         {!entry.photo_path && entry.body.trim() && <p className="letter-text">{entry.body}</p>}
       </div>
-      {entry.photo_path && (
-        <button type="button" className="reply__photo" onClick={() => photoUrl && setZoom(true)} aria-label={`${name}의 편지 사진 크게 보기`}>
-          {photoUrl ? <img src={photoUrl} alt={`${name}의 손글씨 답장`} loading="lazy" /> : <span className="photo-ph">사진 불러오는 중…</span>}
-        </button>
-      )}
-      {zoom && photoUrl && <Lightbox src={photoUrl} onClose={() => setZoom(false)} />}
+      {entry.photo_path && <Photo key={entry.photo_path} path={entry.photo_path} src={photoUrl} alt={`${name}의 답장`} onOpen={onOpen} className="reply__photo" />}
     </article>
   )
 }

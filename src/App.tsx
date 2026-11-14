@@ -1,4 +1,4 @@
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { createBrowserRouter, RouterProvider, Navigate, Route, Routes } from 'react-router-dom'
 import { isConfigured } from './lib/supabase'
 import { SessionProvider, useSession } from './session'
 import { ErrorNote, Loading } from './components/ui'
@@ -42,11 +42,7 @@ export default function App() {
         </p>
       </main>
     )
-  return (
-    <BrowserRouter>
-      <SessionProvider>
-        <Gate />
-      </SessionProvider>
-    </BrowserRouter>
-  )
+  return <RouterProvider router={router} />
 }
+
+const router = createBrowserRouter([{ path: '*', element: <SessionProvider><Gate /></SessionProvider> }])

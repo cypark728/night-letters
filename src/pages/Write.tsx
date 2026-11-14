@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams, useBlocker } from 'react-router-dom'
 import { deleteEntry, fetchMyEntry, removePhoto, saveEntry, signedUrls, uploadPhoto, type Entry } from '../lib/api'
 import { addDays, currentLetter, letterForDate, letterTitle, letterGroup, mmdd, weekLabel } from '../lib/date'
+import { saveWithPhotoCleanup } from '../lib/saveReply'
 import { compressPhoto, formatBytes } from '../lib/image'
 import { useSession } from '../session'
+import { Photo } from '../components/Photo'
 import { ErrorNote, Icon, TopBar } from '../components/ui'
 
 export default function Write() {
@@ -14,7 +16,6 @@ export default function Write() {
   const date = letterForDate(q ?? undefined)?.date ?? currentLetter().date
 
   const [existing, setExisting] = useState<Entry | null>(null)
-  const [label, setLabel] = useState('')
   const [body, setBody] = useState('')
   const [keptPhoto, setKeptPhoto] = useState<string | null>(null) // 이미 올라가 있는 사진 경로
   const [keptUrl, setKeptUrl] = useState<string | null>(null)
@@ -22,6 +23,9 @@ export default function Write() {
   const [newUrl, setNewUrl] = useState<string | null>(null)
   const [sizeNote, setSizeNote] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
+  const [loadedDate, setLoadedDate] = useState<string | null>(null)
+  const [loadAttempt, setLoadAttempt] = useState(0)
+  const bypass = useRef(false)
   const [error, setError] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -31,14 +35,19 @@ export default function Write() {
     let alive = true
     setBusy('불러오는 중…')
     setError(null)
+    setLoadedDate(null)
+    setExisting(null)
+    setBody('')
+    setKeptPhoto(null)
+    setKeptUrl(null)
     setNewFile(null)
     setNewUrl(null)
     setSizeNote(null)
     fetchMyEntry(me.id, date)
       .then(async (e) => {
         if (!alive) return
+        setLoadedDate(date)
         setExisting(e)
-        setLabel(e?.letter_label ?? '')
         setBody(e?.body ?? '')
         setKeptPhoto(e?.photo_path ?? null)
         setKeptUrl(null)
@@ -52,7 +61,7 @@ export default function Write() {
     return () => {
       alive = false
     }
-  }, [me, date])
+  }, [me, date, loadAttempt])
 
   useEffect(() => () => {
     if (newUrl) URL.revokeObjectURL(newUrl)
@@ -85,38 +94,33 @@ export default function Write() {
     setKeptUrl(null)
   }
 
-  const previewUrl = newUrl ?? keptUrl
   const hasPhoto = !!newFile || !!keptPhoto
-  const canSave = !busy && (hasPhoto || body.trim().length > 0)
+  const canSave = loadedDate === date && !busy && (hasPhoto || body.trim().length > 0)
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
     if (!me || !canSave) return
     setError(null)
-    let uploadedPath: string | null = null
-    let saved = false
     try {
       let photoPath = keptPhoto
       if (newFile) {
         setBusy('사진 올리는 중…')
         photoPath = await uploadPhoto(me.id, date, newFile)
-        uploadedPath = photoPath
       }
       setBusy('저장하는 중…')
-      await saveEntry({
+      await saveWithPhotoCleanup({
         member_id: me.id,
         entry_date: date,
         letter_label: letterTitle(date),
         body: body.trim(),
         photo_path: photoPath,
-      })
-      saved = true
-      // 바뀌었거나 빠진 예전 사진은 정리
-      if (existing?.photo_path && existing.photo_path !== photoPath) await removePhoto(existing.photo_path)
+      }, existing?.photo_path ?? null, {save:saveEntry, remove:removePhoto})
+      bypass.current = true
       nav(`/day/${date}`)
-    } catch (err) {
-      if (uploadedPath && !saved) await removePhoto(uploadedPath)
-      setError(err instanceof Error ? err.message : String(err))
+    } catch {
+      // An unsuccessful response does not prove the database write failed.
+      // Keep the uploaded object to avoid deleting a photo that was committed.
+      setError('저장 결과를 확인하지 못했어요. 입력 내용은 유지됩니다. 다시 저장해 주세요.')
       setBusy(null)
     }
   }
@@ -126,7 +130,8 @@ export default function Write() {
     setBusy('지우는 중…')
     try {
       await deleteEntry(existing.id)
-      if (existing.photo_path) await removePhoto(existing.photo_path)
+      if (existing.photo_path) { try { await removePhoto(existing.photo_path) } catch { /* Reply has already been deleted. */ } }
+      bypass.current = true
       nav(`/day/${date}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -134,18 +139,29 @@ export default function Write() {
     }
   }
 
-  const setDate = (d: string) => {
-    if (busy || d === date) return
-    const dirty = label !== (existing?.letter_label ?? '') || body !== (existing?.body ?? '') || !!newFile || keptPhoto !== (existing?.photo_path ?? null)
-    if (dirty && !confirm('저장하지 않은 내용이 있어요. 날짜를 바꿀까요?')) return
-    setParams({ date: d })
-  }
+  const dirty = loadedDate === date && (body !== (existing?.body ?? '') || !!newFile || keptPhoto !== (existing?.photo_path ?? null))
+  const blocker = useBlocker(() => !bypass.current && (dirty || !!busy && loadedDate === date))
+  useEffect(() => {
+    if (blocker.state === 'blocked') {
+      if (busy) { blocker.reset(); return }
+      if (confirm('저장하지 않은 내용이 있어요. 이동할까요?')) blocker.proceed()
+      else blocker.reset()
+    }
+  }, [blocker, busy])
+  useEffect(() => {
+    const protect = (e: BeforeUnloadEvent) => { if (dirty || busy && loadedDate === date) { e.preventDefault(); e.returnValue = '' } }
+    window.addEventListener('beforeunload', protect)
+    return () => window.removeEventListener('beforeunload', protect)
+  }, [dirty, busy, loadedDate, date])
+  const setDate = (d: string) => { if (!busy && d !== date) setParams({date:d}) }
 
   return (
     <div className="page">
       <form className="container narrow stack write" onSubmit={onSubmit}>
         <TopBar back={`/day/${date}`} sub={letterTitle(date)} title={existing ? '답장 수정' : '답장 쓰기'} />
 
+        <p className="soft">{me?.name}님의 {letterTitle(date)} 답장</p>
+        {loadedDate !== date && !busy && <button type="button" className="btn btn--ghost" onClick={() => setLoadAttempt(v => v + 1)}>기존 답장 다시 불러오기</button>}
         <fieldset className="stack-xs plain" disabled={!!busy}>
           <legend className="field-label">어느 편지의 답장인가요?</legend>
           <div className="weekpick">
@@ -156,11 +172,11 @@ export default function Write() {
           <span className="muted small center">{weekLabel(letterGroup(date)[0].date)}</span>
         </fieldset>
 
-        <div className="stack-xs">
+        <fieldset className="stack-xs plain" disabled={!!busy || loadedDate !== date}>
           <span className="field-label">편지 사진</span>
-          {previewUrl ? (
+          {hasPhoto ? (
             <div className="photo-preview">
-              <img src={previewUrl} alt="올릴 편지 사진 미리보기" />
+              {newUrl ? <img src={newUrl} alt="새 답장 사진 미리보기" /> : keptPhoto && <Photo key={keptPhoto} path={keptPhoto} src={keptUrl ?? undefined} alt="저장된 답장 사진" />}
               <div className="photo-preview__actions">
                 <button type="button" className="pill" onClick={() => fileRef.current?.click()}>
                   <Icon name="camera" size={16} /> 다른 사진
@@ -183,7 +199,8 @@ export default function Write() {
             </span>
           )}
           <input ref={fileRef} type="file" accept="image/*" hidden onChange={onPick} />
-        </div>
+
+        </fieldset>
 
         {!hasPhoto && (
         <div className="stack-xs">
@@ -191,6 +208,7 @@ export default function Write() {
             한 줄 메모 {hasPhoto && <span className="muted">(선택)</span>}
           </label>
           <textarea
+            disabled={!!busy || loadedDate !== date}
             id="body"
             className="input textarea"
             value={body}

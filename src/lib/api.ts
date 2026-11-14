@@ -116,7 +116,8 @@ export async function uploadPhoto(memberId: string, date: string, file: File): P
 }
 
 export async function removePhoto(path: string): Promise<void> {
-  await supabase.storage.from('photos').remove([path])
+  const { error } = await supabase.storage.from('photos').remove([path])
+  fail(error)
 }
 
 /** 비공개 사진을 1시간짜리 서명 URL로 */

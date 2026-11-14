@@ -82,3 +82,25 @@ export function stamp(ts: string): string {
   const d = new Date(ts)
   return `${DAY_SHORT[d.getDay()]} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
+
+// Storage remains date-based so previously uploaded replies keep their identity.
+const ORDINALS = ['첫','두','세','네','다섯','여섯','일곱','여덟','아홉','열','열한','열두','열세','열네','열다섯','열여섯','열일곱','열여덟','열아홉','스무','스물한','스물두','스물세','스물네','스물다섯','스물여섯','스물일곱','스물여덟','스물아홉','서른']
+export const LETTERS = Array.from({ length: 30 }, (_, index) => {
+  const offset = index - 10
+  const weeks = Math.floor(offset / 5)
+  const weekday = ((offset % 5) + 5) % 5
+  return { number: index + 1, date: addDays('2026-11-09', weeks * 7 + weekday), title: `${ORDINALS[index]} 번째 편지` }
+})
+export function letterForDate(date: string | undefined) { return LETTERS.find(l => l.date === date) }
+export function currentLetter() {
+  return LETTERS.filter(l => l.date <= todayISO()).at(-1) ?? LETTERS[0]
+}
+export function letterTitle(date: string) { return letterForDate(date)?.title ?? '편지' }
+export function letterGroup(date: string) {
+  const n = letterForDate(date)?.number ?? currentLetter().number
+  return LETTERS.slice(Math.floor((n - 1) / 5) * 5, Math.floor((n - 1) / 5) * 5 + 5)
+}
+export function nextLetter(date: string) {
+  const n = letterForDate(date)?.number
+  return n ? LETTERS[n] : undefined
+}

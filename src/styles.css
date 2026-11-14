@@ -950,3 +950,17 @@ button, .btn { min-height: 44px; }
 .lightbox { overflow: auto; touch-action: pan-x pan-y pinch-zoom; }
 .lightbox img { touch-action: pan-x pan-y pinch-zoom; }
 @media (max-width: 380px) { .container { padding-left: 14px; padding-right: 14px; } .day-row { gap: 8px; } .weekpick { gap: 4px; } .chip { padding: 8px; } }
+
+/* A reply is its author's heading followed by the uncropped photo. */
+.reply { align-self: start; }
+.reply__photo { aspect-ratio: auto; min-height: 0; }
+.reply__photo img { height: auto; object-fit: contain; }
+.share__card, .share__card.has-photo { flex: 0 0 auto; flex-direction: column; }
+.share__card.has-photo .share__photo { width: 100%; max-height: none; min-height: 0; flex-shrink: 0; }
+.share__card.has-photo .share__photo img { width: 100%; height: auto; max-height: none; object-fit: contain; }
+.share__text { flex: 0 0 auto; overflow: visible; padding: 18px 20px; }
+.share__main { overflow-y: auto; }
+select.input { width: 100%; min-height: 48px; }
+.lightbox { padding: 0; background: #080a12; height: 100dvh; }
+.lightbox img { max-width: 100%; max-height: 100dvh; }
+@media (min-width: 900px) { .share__card { width: min(100%, 820px); margin-inline: auto; } }

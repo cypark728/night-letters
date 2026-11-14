@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { deleteEntry, fetchMyEntry, removePhoto, saveEntry, signedUrls, uploadPhoto, type Entry } from '../lib/api'
-import { addDays, dayName, defaultWriteDate, isISODate, mmdd, weekDays, weekLabel, weekStartFor } from '../lib/date'
+import { addDays, currentLetter, letterForDate, letterTitle, letterGroup, mmdd, weekLabel } from '../lib/date'
 import { compressPhoto, formatBytes } from '../lib/image'
 import { useSession } from '../session'
 import { ErrorNote, Icon, TopBar } from '../components/ui'
@@ -11,8 +11,7 @@ export default function Write() {
   const nav = useNavigate()
   const [params, setParams] = useSearchParams()
   const q = params.get('date')
-  const date = isISODate(q) ? q : defaultWriteDate()
-  const monday = weekStartFor(date)
+  const date = letterForDate(q ?? undefined)?.date ?? currentLetter().date
 
   const [existing, setExisting] = useState<Entry | null>(null)
   const [label, setLabel] = useState('')
@@ -107,7 +106,7 @@ export default function Write() {
       await saveEntry({
         member_id: me.id,
         entry_date: date,
-        letter_label: label.trim() || null,
+        letter_label: letterTitle(date),
         body: body.trim(),
         photo_path: photoPath,
       })
@@ -145,33 +144,16 @@ export default function Write() {
   return (
     <div className="page">
       <form className="container narrow stack write" onSubmit={onSubmit}>
-        <TopBar back={`/?w=${monday}`} sub={`${mmdd(date)} ${dayName(date)}요일`} title={existing ? '답장 고치기' : '오늘의 답장'} />
+        <TopBar back={`/day/${date}`} sub={letterTitle(date)} title={existing ? '답장 수정' : '답장 쓰기'} />
 
-        <fieldset className="stack-xs plain">
-          <legend className="field-label">어느 날 편지인가요?</legend>
+        <fieldset className="stack-xs plain" disabled={!!busy}>
+          <legend className="field-label">어느 편지의 답장인가요?</legend>
           <div className="weekpick">
-            <button type="button" className="icon-btn" aria-label="지난 주" onClick={() => setDate(addDays(monday, -7))}>
-              <Icon name="left" />
-            </button>
-            <div className="chips">
-              {weekDays(monday).map((d) => (
-                <button
-                  key={d}
-                  type="button"
-                  className={d === date ? 'chip is-on' : 'chip'}
-                  aria-pressed={d === date}
-                  onClick={() => setDate(d)}
-                >
-                  <span>{dayName(d)}</span>
-                  <span className="chip__sub">{mmdd(d)}</span>
-                </button>
-              ))}
-            </div>
-            <button type="button" className="icon-btn" aria-label="다음 주" onClick={() => setDate(addDays(monday, 7))}>
-              <Icon name="right" />
-            </button>
+            <button type="button" className="icon-btn" aria-label="지난주" disabled={!letterForDate(addDays(letterGroup(date)[0].date,-7))} onClick={() => setDate(addDays(letterGroup(date)[0].date,-7))}><Icon name="left" /></button>
+            <div className="chips">{letterGroup(date).map(l => <button key={l.number} type="button" className={l.date === date ? 'chip is-on' : 'chip'} aria-pressed={l.date === date} onClick={() => setDate(l.date)} aria-label={l.title}><span>{l.number}번째</span><span className="chip__sub">{mmdd(l.date)}</span></button>)}</div>
+            <button type="button" className="icon-btn" aria-label="다음 주" disabled={!letterForDate(addDays(letterGroup(date)[0].date,7))} onClick={() => setDate(addDays(letterGroup(date)[0].date,7))}><Icon name="right" /></button>
           </div>
-          <span className="muted small center">{weekLabel(monday)}</span>
+          <span className="muted small center">{weekLabel(letterGroup(date)[0].date)}</span>
         </fieldset>
 
         <div className="stack-xs">
@@ -203,13 +185,7 @@ export default function Write() {
           <input ref={fileRef} type="file" accept="image/*" hidden onChange={onPick} />
         </div>
 
-        <div className="stack-xs">
-          <label htmlFor="label" className="field-label">
-            편지 번호나 제목 <span className="muted">(선택)</span>
-          </label>
-          <input id="label" className="input" value={label} onChange={(e) => setLabel(e.target.value)} placeholder="예: No. 41" />
-        </div>
-
+        {!hasPhoto && (
         <div className="stack-xs">
           <label htmlFor="body" className="field-label">
             한 줄 메모 {hasPhoto && <span className="muted">(선택)</span>}
@@ -223,6 +199,7 @@ export default function Write() {
             placeholder={hasPhoto ? '사진에 덧붙이고 싶은 말이 있다면' : '사진 대신 바로 답장을 써도 돼요'}
           />
         </div>
+        )}
 
         {error && <ErrorNote message={error} />}
 

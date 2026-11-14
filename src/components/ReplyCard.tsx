@@ -16,15 +16,10 @@ export function ReplyCard({ entry, member, photoUrl, mine }: Props) {
   const name = member?.name ?? '알 수 없음'
   return (
     <article className="paper reply">
-      {entry.photo_path && (
-        <button type="button" className="reply__photo" onClick={() => photoUrl && setZoom(true)} aria-label={`${name}의 편지 사진 크게 보기`}>
-          {photoUrl ? <img src={photoUrl} alt={`${name}의 손글씨 답장`} loading="lazy" /> : <span className="photo-ph">사진 불러오는 중…</span>}
-        </button>
-      )}
       <div className="reply__body">
         <div className="reply__head">
           <Avatar name={name} />
-          <strong>{name}</strong>
+          <strong>{name}의 답장</strong>
           <span className="reply__time">{stamp(entry.created_at)}</span>
           {mine && (
             <Link to={`/write?date=${entry.entry_date}`} className="reply__edit" aria-label="내 답장 수정">
@@ -32,8 +27,13 @@ export function ReplyCard({ entry, member, photoUrl, mine }: Props) {
             </Link>
           )}
         </div>
-        {entry.body.trim() && <p className="letter-text">{entry.body}</p>}
+        {!entry.photo_path && entry.body.trim() && <p className="letter-text">{entry.body}</p>}
       </div>
+      {entry.photo_path && (
+        <button type="button" className="reply__photo" onClick={() => photoUrl && setZoom(true)} aria-label={`${name}의 편지 사진 크게 보기`}>
+          {photoUrl ? <img src={photoUrl} alt={`${name}의 손글씨 답장`} loading="lazy" /> : <span className="photo-ph">사진 불러오는 중…</span>}
+        </button>
+      )}
       {zoom && photoUrl && <Lightbox src={photoUrl} onClose={() => setZoom(false)} />}
     </article>
   )

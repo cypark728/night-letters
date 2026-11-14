@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 
 type IconName = 'left' | 'right' | 'close' | 'camera' | 'image' | 'pen' | 'cards' | 'check'
@@ -78,15 +78,27 @@ export function TopBar({ back, title, sub, right }: { back?: string; title?: Rea
 }
 
 export function Lightbox({ src, onClose }: { src: string; onClose: () => void }) {
+  const closeRef = useRef<HTMLButtonElement>(null)
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
+    const previous = document.activeElement as HTMLElement | null
+    const overflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    closeRef.current?.focus()
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+      if (e.key === 'Tab') { e.preventDefault(); closeRef.current?.focus() }
+    }
     window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    return () => {
+      document.body.style.overflow = overflow
+      previous?.focus()
+      window.removeEventListener('keydown', onKey)
+    }
   }, [onClose])
   return (
     <div className="lightbox" role="dialog" aria-modal="true" aria-label="사진 크게 보기" onClick={onClose}>
       <img src={src} alt="손글씨 답장 사진" onClick={(e) => e.stopPropagation()} />
-      <button type="button" className="lightbox__close" aria-label="닫기" onClick={onClose}>
+      <button type="button" ref={closeRef} className="lightbox__close" aria-label="닫기" onClick={onClose}>
         <Icon name="close" size={24} />
       </button>
     </div>

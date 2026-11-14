@@ -94,11 +94,14 @@ export default function Write() {
     e.preventDefault()
     if (!me || !canSave) return
     setError(null)
+    let uploadedPath: string | null = null
+    let saved = false
     try {
       let photoPath = keptPhoto
       if (newFile) {
         setBusy('사진 올리는 중…')
         photoPath = await uploadPhoto(me.id, date, newFile)
+        uploadedPath = photoPath
       }
       setBusy('저장하는 중…')
       await saveEntry({
@@ -108,10 +111,12 @@ export default function Write() {
         body: body.trim(),
         photo_path: photoPath,
       })
+      saved = true
       // 바뀌었거나 빠진 예전 사진은 정리
       if (existing?.photo_path && existing.photo_path !== photoPath) await removePhoto(existing.photo_path)
       nav(`/day/${date}`)
     } catch (err) {
+      if (uploadedPath && !saved) await removePhoto(uploadedPath)
       setError(err instanceof Error ? err.message : String(err))
       setBusy(null)
     }
@@ -130,7 +135,12 @@ export default function Write() {
     }
   }
 
-  const setDate = (d: string) => setParams({ date: d })
+  const setDate = (d: string) => {
+    if (busy || d === date) return
+    const dirty = label !== (existing?.letter_label ?? '') || body !== (existing?.body ?? '') || !!newFile || keptPhoto !== (existing?.photo_path ?? null)
+    if (dirty && !confirm('저장하지 않은 내용이 있어요. 날짜를 바꿀까요?')) return
+    setParams({ date: d })
+  }
 
   return (
     <div className="page">

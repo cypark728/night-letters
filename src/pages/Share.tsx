@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Link, Navigate, useParams } from 'react-router-dom'
+import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import { fetchDay } from '../lib/api'
-import { dayFull, isISODate, mmdd, stamp } from '../lib/date'
+import { addDays, dayFull, isISODate, mmdd, stamp, weekStartFor } from '../lib/date'
 import { commonLabel, sortByMembers, useLoad, usePhotoUrls } from '../lib/hooks'
 import { useSession } from '../session'
 import { Avatar, ErrorNote, Icon, Lightbox, Loading } from '../components/ui'
@@ -9,6 +9,7 @@ import { Avatar, ErrorNote, Icon, Lightbox, Loading } from '../components/ui'
 /** 주일 나눔 모드: 한 사람씩 크게. 넓은 화면(아이패드/PC)에서는 왼쪽에 사람 목록 */
 export default function Share() {
   const { date } = useParams()
+  const nav = useNavigate()
   const { members, memberById } = useSession()
   const valid = isISODate(date)
   const { data, error, loading } = useLoad(() => (valid ? fetchDay(date) : Promise.resolve([])), [date])
@@ -30,8 +31,6 @@ export default function Share() {
 
   if (!valid) return <Navigate to="/" replace />
 
-  const done = new Set(entries.map((e) => e.member_id))
-  const missing = members.filter((m) => !done.has(m.id))
   const idx = Math.min(i, Math.max(0, n - 1))
   const cur = entries[idx]
   const curName = cur ? (memberById[cur.member_id]?.name ?? '알 수 없음') : ''
@@ -75,12 +74,7 @@ export default function Share() {
               </button>
             )
           })}
-          {missing.map((m) => (
-            <div key={m.id} className="person person--missing">
-              <Avatar name={m.name} size={34} dashed />
-              <span>{m.name} · 답장 전</span>
-            </div>
-          ))}
+
         </nav>
       </aside>
 
@@ -116,13 +110,14 @@ export default function Share() {
           </article>
         )}
 
+        {n === 0 && !loading && <Link className="btn btn--primary" to={date === addDays(weekStartFor(date),4) ? `/?w=${weekStartFor(date)}` : `/share/${addDays(date,1)}`}>다음으로</Link>}
         {n > 0 && (
           <div className="share__nav">
             <button type="button" className="btn btn--ghost" onClick={() => setI(Math.max(0, idx - 1))} disabled={idx === 0} aria-label="이전 사람">
               <Icon name="left" size={22} />
             </button>
-            <button type="button" className="btn btn--primary grow" onClick={() => setI(idx === n - 1 ? 0 : idx + 1)}>
-              {idx === n - 1 ? '처음부터 다시' : '다음 사람'} <Icon name="right" />
+            <button type="button" className="btn btn--primary grow" onClick={() => { if(idx < n - 1) setI(idx + 1); else { setI(0); nav(date === addDays(weekStartFor(date),4) ? `/?w=${weekStartFor(date)}` : `/share/${addDays(date,1)}`) } }}>
+              {idx === n - 1 ? (date === addDays(weekStartFor(date),4) ? '이번 주 읽기 마치기' : '다음 날짜 읽기') : '다음 사람'} <Icon name="right" />
             </button>
           </div>
         )}

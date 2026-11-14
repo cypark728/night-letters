@@ -15,7 +15,7 @@ export function parseISO(s: string): Date {
 }
 
 export function isISODate(s: string | null | undefined): s is string {
-  return !!s && /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(parseISO(s).getTime())
+  return !!s && /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(parseISO(s).getTime()) && toISO(parseISO(s)) === s
 }
 
 export function addDays(iso: string, n: number): string {

@@ -1,9 +1,9 @@
 import { Link, Navigate, useParams } from 'react-router-dom'
 import { fetchDay } from '../lib/api'
-import { dayFull, isISODate, mmdd, weekStartFor } from '../lib/date'
+import { addDays, dayFull, isISODate, mmdd, weekDays, weekStartFor } from '../lib/date'
 import { commonLabel, sortByMembers, useLoad, usePhotoUrls } from '../lib/hooks'
 import { useSession } from '../session'
-import { MissingCard, ReplyCard } from '../components/ReplyCard'
+import { ReplyCard } from '../components/ReplyCard'
 import { ErrorNote, Icon, Loading, TopBar } from '../components/ui'
 
 export default function Day() {
@@ -15,8 +15,6 @@ export default function Day() {
   const urls = usePhotoUrls(data)
   if (!valid) return <Navigate to="/" replace />
 
-  const done = new Set(entries.map((e) => e.member_id))
-  const missing = members.filter((m) => !done.has(m.id))
   const label = commonLabel(entries)
 
   return (
@@ -36,13 +34,15 @@ export default function Day() {
               <Icon name="cards" /> 한 장씩 넘겨보며 나누기
             </Link>
           )}
-          {me && !done.has(me.id) && (
+          {me && (
             <Link to={`/write?date=${date}`} className="btn btn--ghost grow">
               <Icon name="pen" /> 이 날 답장 쓰기
             </Link>
           )}
         </div>
 
+        <nav className="chips" aria-label="날짜 선택">{weekDays(weekStartFor(date)).map(d => <Link key={d} className={d === date ? 'chip is-on' : 'chip'} to={`/day/${d}`}>{dayFull(d)}<span className="chip__sub">{mmdd(d)}</span></Link>)}</nav>
+        <Link className="link-btn" to={`/day/${addDays(date, 1)}`}>다음 날짜 읽기 →</Link>
         {error && <ErrorNote message={error} />}
         {loading && !data ? (
           <Loading />
@@ -57,9 +57,7 @@ export default function Day() {
                 mine={e.member_id === me?.id}
               />
             ))}
-            {missing.map((m) => (
-              <MissingCard key={m.id} name={m.name} />
-            ))}
+
           </div>
         )}
       </main>

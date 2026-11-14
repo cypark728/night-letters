@@ -939,3 +939,14 @@ fieldset.plain {
   justify-content: center;
   cursor: pointer;
 }
+
+/* Small cover screens, phones and tablets */
+html { overflow-wrap: anywhere; }
+.container { width: 100%; }
+.chips { min-width: 0; overflow-x: auto; }
+.chip { min-height: 48px; display: inline-flex; flex-direction: column; align-items: center; justify-content: center; }
+button, .btn { min-height: 44px; }
+.page { padding-bottom: env(safe-area-inset-bottom, 16px); }
+.lightbox { overflow: auto; touch-action: pan-x pan-y pinch-zoom; }
+.lightbox img { touch-action: pan-x pan-y pinch-zoom; }
+@media (max-width: 380px) { .container { padding-left: 14px; padding-right: 14px; } .day-row { gap: 8px; } .weekpick { gap: 4px; } .chip { padding: 8px; } }

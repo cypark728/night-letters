@@ -48,6 +48,7 @@ export default function Join() {
             </label>
             <input
               id="code"
+              type="password"
               className="input"
               value={code}
               onChange={(e) => setCode(e.target.value)}

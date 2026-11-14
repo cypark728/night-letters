@@ -9,6 +9,7 @@ export function useLoad<T>(load: () => Promise<T>, deps: unknown[]) {
 
   useEffect(() => {
     let alive = true
+    setData(null)
     setLoading(true)
     setError(null)
     load()

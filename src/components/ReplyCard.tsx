@@ -1,8 +1,10 @@
 import { Link } from 'react-router-dom'
+import { useState } from 'react'
 import type { Entry, Member } from '../lib/api'
 import { Photo } from './Photo'
 import { stamp } from '../lib/date'
 import { Avatar, Icon } from './ui'
+import { ReplyShareDialog } from './ReplyShareDialog'
 
 interface Props {
   entry: Entry
@@ -13,6 +15,7 @@ interface Props {
 }
 
 export function ReplyCard({ entry, member, photoUrl, mine, onOpen }: Props) {
+  const [sharing, setSharing] = useState(false)
   const name = member?.name ?? '알 수 없음'
   return (
     <article className="paper reply">
@@ -30,6 +33,8 @@ export function ReplyCard({ entry, member, photoUrl, mine, onOpen }: Props) {
         {!entry.photo_path && entry.body.trim() && <p className="letter-text">{entry.body}</p>}
       </div>
       {entry.photo_path && <Photo key={entry.photo_path} path={entry.photo_path} src={photoUrl} alt={`${name}의 답장`} onOpen={onOpen} className="reply__photo" />}
+      {mine && <button type="button" className="reply-share-action" onClick={() => setSharing(true)}>내 답장 공유하기</button>}
+      {sharing && <ReplyShareDialog reply={{body:entry.body, photoPath:entry.photo_path}} onDone={() => setSharing(false)} />}
     </article>
   )
 }

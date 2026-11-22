@@ -6,6 +6,7 @@ import { saveWithPhotoCleanup } from '../lib/saveReply'
 import { compressPhoto, formatBytes } from '../lib/image'
 import { useSession } from '../session'
 import { Photo } from '../components/Photo'
+import { ReplyShareDialog, type ShareableReply } from '../components/ReplyShareDialog'
 import { ErrorNote, Icon, TopBar } from '../components/ui'
 
 export default function Write() {
@@ -28,6 +29,7 @@ export default function Write() {
   const bypass = useRef(false)
   const [error, setError] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  const [savedReply, setSavedReply] = useState<ShareableReply | null>(null)
 
   // 날짜가 바뀌면 그 날 내 답장을 불러옴
   useEffect(() => {
@@ -116,7 +118,8 @@ export default function Write() {
         photo_path: photoPath,
       }, existing?.photo_path ?? null, {save:saveEntry, remove:removePhoto})
       bypass.current = true
-      nav(`/day/${date}`)
+      setBusy(null)
+      setSavedReply({ body: body.trim(), photoPath, file: newFile ?? undefined })
     } catch {
       // An unsuccessful response does not prove the database write failed.
       // Keep the uploaded object to avoid deleting a photo that was committed.
@@ -139,7 +142,7 @@ export default function Write() {
     }
   }
 
-  const dirty = loadedDate === date && (body !== (existing?.body ?? '') || !!newFile || keptPhoto !== (existing?.photo_path ?? null))
+  const dirty = !savedReply && loadedDate === date && (body !== (existing?.body ?? '') || !!newFile || keptPhoto !== (existing?.photo_path ?? null))
   const blocker = useBlocker(() => !bypass.current && (dirty || !!busy && loadedDate === date))
   useEffect(() => {
     if (blocker.state === 'blocked') {
@@ -157,7 +160,7 @@ export default function Write() {
 
   return (
     <div className="page">
-      <form className="container narrow stack write" onSubmit={onSubmit}>
+      <form className="container narrow stack write" onSubmit={onSubmit} inert={!!savedReply}>
         <TopBar back={`/day/${date}`} sub={letterTitle(date)} title={existing ? '답장 수정' : '답장 쓰기'} />
 
         <p className="soft">{me?.name}님의 {letterTitle(date)} 답장</p>
@@ -230,6 +233,7 @@ export default function Write() {
           </button>
         )}
       </form>
+      {savedReply && <ReplyShareDialog saved reply={savedReply} onDone={() => nav(`/day/${date}`)} />}
     </div>
   )
 }

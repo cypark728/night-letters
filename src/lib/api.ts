@@ -135,6 +135,16 @@ export async function removePhoto(path: string): Promise<void> {
   fail(error)
 }
 
+/** Read into memory for native file sharing. Never saves a file to the device. */
+export async function downloadPhotoForShare(path: string): Promise<File> {
+  const { data, error } = await supabase.storage.from('photos').download(path)
+  fail(error)
+  if (!data) throw new Error('사진을 불러오지 못했어요.')
+  const type = data.type.split(';')[0] || 'image/jpeg'
+  const extension = type === 'image/png' ? 'png' : type === 'image/webp' ? 'webp' : 'jpg'
+  return new File([data], `night-letter.${extension}`, { type })
+}
+
 /** 비공개 사진을 1시간짜리 서명 URL로 */
 const photoUrls = new PhotoUrlCache()
 export async function signedUrls(paths: string[], force=false): Promise<Record<string, string>> {

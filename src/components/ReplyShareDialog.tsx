@@ -47,7 +47,11 @@ export function ReplyShareDialog({ reply, saved = false, onDone }: { reply: Shar
     setMessage('')
     // No fetch/await before share(): preserve the browser's user activation.
     void shareReply(replyShareData(reply.body, isPhoto ? file : undefined)).then(result => {
-      setMessage(result === 'cancelled' ? '공유를 취소했어요. 답장은 그대로 저장되어 있어요.' : result === 'unsupported' ? '이 브라우저에서는 이 내용의 공유를 지원하지 않아요.' : '공유 창을 닫았어요. 전송 여부는 카카오톡에서 확인해 주세요.')
+      if (result === 'closed') {
+        onDone()
+        return
+      }
+      setMessage(result === 'cancelled' ? '공유를 취소했어요. 답장은 그대로 저장되어 있어요.' : '이 브라우저에서는 이 내용의 공유를 지원하지 않아요.')
     }).catch(() => setMessage('공유 창을 열지 못했어요. 다시 시도하거나 다른 브라우저에서 열어 주세요.')).finally(() => {
       sending.current = false
       setSharing(false)
